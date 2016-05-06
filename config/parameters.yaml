@@ -1,0 +1,9 @@
+image_topic: "/usb_cam/image_raw"
+
+main_message_topic: "/clothes_detection/results"
+
+face_image_message_topic: "/clothes_detection/face_image"
+whole_image_message_topic: "/clothes_detection/image"
+
+publish_face: True
+publish_whole_image: True

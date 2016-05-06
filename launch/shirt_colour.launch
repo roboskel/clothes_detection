@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<launch>
+	<master auto="start"/>
+
+	<node pkg="clothes_detection" type="shirt_colour.py" respawn="false" name="clothes_detection" output="screen">
+		<rosparam file="$(find clothes_detection)/config/parameters.yaml" command="load" />
+	</node>
+</launch>
