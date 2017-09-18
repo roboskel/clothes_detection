@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 import os
+
+import sys
+sys.path.append('/usr/local/lib/python2.7/site-packages')
+
 import cv2
 import sys
 import rospy
+import traceback
 import numpy as np
-import cv2.cv as cv
+#import cv2.cv as cv
 from cv_bridge import CvBridge
 from collections import Counter
 from std_msgs.msg import Header
@@ -15,7 +20,6 @@ from clothes_detection.msg import MainMsg
 from clothes_detection.msg import ImgArray
 from clothes_detection.msg import BoundingBox
 
-storage = None
 image_topic = ""
 frame_counter = 0
 publish_all = False
@@ -50,21 +54,20 @@ def intersect_rectangles(r1, r2):
 	return Eratio
 
 def initialize_face():
-	global storage, cascadeFrontal, HAAR_CASCADE_PATH_FRONTAL
+	global cascadeFrontal, HAAR_CASCADE_PATH_FRONTAL
 	try:
-		cascadeFrontal = cv2.cv.Load(HAAR_CASCADE_PATH_FRONTAL);
-		storage = cv2.cv.CreateMemStorage()
+		cascadeFrontal = cv2.CascadeClassifier(HAAR_CASCADE_PATH_FRONTAL);
 	except ValueError:
 		print ValueError
-	return (cascadeFrontal, storage)
+	return cascadeFrontal
 
-def detect_faces(image, cascadeFrontal, storage):
+def detect_faces(image, cascadeFrontal):
 	facesFrontal = []; 	
 
-	detectedFrontal = cv2.cv.HaarDetectObjects(image, cascadeFrontal, storage, 1.3, 2, cv2.cv.CV_HAAR_DO_CANNY_PRUNING, (image.width/10, image.width/10))
+	detectedFrontal = cascadeFrontal.detectMultiScale(image, 1.3, 5)
 	
-	if detectedFrontal:
-		for (x,y,w,h),n in detectedFrontal:
+	if len(detectedFrontal) > 0:
+		for (x,y,w,h) in detectedFrontal:
 			facesFrontal.append((x,y,w,h))
 
 	# remove overlaps:
@@ -104,7 +107,7 @@ def imageCallback(image_message):
 	cv_image = CvBridge().imgmsg_to_cv2(image_message, "bgr8")
 	
 	height, width, channels = cv_image.shape
-	facesFrontal = detect_faces(cv2.cv.fromarray(cv_image), cascadeFrontal, storage)
+	facesFrontal = detect_faces(cv_image, cascadeFrontal)
 		
 	for f in facesFrontal:
 		#boolean values to synchronize the rectangles
@@ -183,7 +186,7 @@ def imageCallback(image_message):
 			criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
 			K = 2
 			try:
-				ret, label, center = cv2.kmeans(Z, K, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+				ret, label, center = cv2.kmeans(Z, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
 				colour_ = []
 				if list(label).count([0]) > list(label).count([1]):
 					colour_ = Z[np.where(label==[0])]
@@ -206,6 +209,7 @@ def imageCallback(image_message):
 
 			except:
 				print sys.exc_info()[0]
+				traceback.print_exc()
 
 		if face_checker:
 			shirts_rect.append(p)
@@ -250,7 +254,7 @@ def initNode():
 
 	HAAR_CASCADE_PATH_FRONTAL = os.path.dirname(os.path.realpath(sys.argv[0])) + "/data/haarcascades/haarcascade_frontalface_default.xml" # loads the face detector cascade classifier
 	
-	(cascadeFrontal, storage) = initialize_face() # initialize face detector
+	cascadeFrontal = initialize_face() # initialize face detector
 
 	image_subscriber = rospy.Subscriber(image_topic, Image, imageCallback)
 	while not rospy.is_shutdown():
